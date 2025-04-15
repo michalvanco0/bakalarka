@@ -1,16 +1,19 @@
 import json
 import os
 
-ALL_PUNCTUATION = ",./;'[]\"!-:<>{}()|"
+ALL_PUNCTUATION = "!\"\'()*+,-./:;<=>?[]^_`{|}~»«"
 CONFIG_FILE = "config.json"
 DEFAULT_CONFIG = {
-    "punctuation_mode": "merged",
-    "punctuation_pattern": ".,?!",
+    "punctuation_mode": "split",
+    "punctuation_pattern": "!\"\'()*+,-./:;<=>?[]^_`{|}~»«",
     "save_directory": "C:\\Users\\User\\bakalarka\\bakalarka\\analysis_results",
     "node_color": "black",
     "edge_color": "gray",
     "punc_node_color": "red",
-    "punc_edge_color": "salmon"
+    "punc_edge_color": "salmon",
+    "weighed": False,
+    "directed": False,
+    "show_labels": False
 }
 
 

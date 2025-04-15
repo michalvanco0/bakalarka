@@ -2,7 +2,7 @@ import re
 from config_setter import load_config
 
 
-def preprocess_text(text, keep_punctuation=True):
+def tokenize_text(text, keep_punctuation=True):
     config = load_config()
     pattern = f"[{re.escape(config["punctuation_pattern"])}]+"
     mode = config["punctuation_mode"]
@@ -36,6 +36,14 @@ def preprocess_text(text, keep_punctuation=True):
                 tokens.append(cleaned_word.strip())
 
     return tokens
+
+
+def sentence_tokenize_text(text):
+    config = load_config()
+    sentence_delimiters = re.compile(r'(?<=[.!?])\s+(?=[A-Z])')
+    sentences = re.split(sentence_delimiters, text)
+    print(sentences)
+    return [s.strip() for s in sentences if s.strip()]
 
 
 def read_text_from_file(file_path):
