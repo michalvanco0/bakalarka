@@ -4,10 +4,8 @@ from collections import Counter
 import networkx as nx
 import nltk
 import numpy as np
-import spacy
 from scipy.stats import linregress, poisson
 from textstat import textstat
-from nltk.tokenize import word_tokenize, sent_tokenize
 from nltk.probability import FreqDist
 from nltk import pos_tag, ne_chunk, BigramCollocationFinder, BigramAssocMeasures
 from nltk.tree import Tree
@@ -16,10 +14,10 @@ from textblob import TextBlob
 from config_setter import load_config
 from text_processing import tokenize_text, sentence_tokenize_text
 
-nltk.download('averaged_perceptron_tagger_eng')
-nltk.download('maxent_ne_chunker_tab')
-nltk.download('punkt')
-nltk.download('punkt_tab')
+# nltk.download('averaged_perceptron_tagger_eng')
+# nltk.download('maxent_ne_chunker_tab')
+# nltk.download('punkt')
+# nltk.download('punkt_tab')
 ALL_PUNCTUATION = '!"\'()*+,-./:;<=>?[\\]^_`{|}~»«'
 
 def jaccard_similarity(G1, G2):
@@ -207,28 +205,17 @@ def ling_analysis(text):
 def compare_networks(G1, G2):
     G1_nodes = list(G1.nodes())
     G2_nodes = list(G2.nodes())
-    result = f'''
-    Network with Punctuation
-        Nodes: {len(G1.nodes())}
-        Edges: {len(G1.edges())}
-        Density: {graph_density(G1):.4f}
-        Clustering Coefficient: {clustering_coefficient(G1):.4f}
-        Degree Distribution: {degree_distribution(G1)[:10]}
-        Slope: {get_slope(G1)[0]}
-        Collocations: {extract_collocations(G1_nodes, 10)}
-        Lexical diversity: {lexical_diversity(G1_nodes):.4f}
-        
-    Network without Punctuation
-        Nodes: {len(G2.nodes())}
-        Edges: {len(G2.edges())}
-        Density: {graph_density(G2):.4f}
-        Clustering Coefficient: {clustering_coefficient(G2):.4f}
-        Degree Distribution: {degree_distribution(G2)[:10]}
-        Slope: {get_slope(G2)[0]}
-        Collocations: {extract_collocations(G2_nodes, 10)}
-        Lexical diversity: {lexical_diversity(G2_nodes):.4f}
-    
-    Jaccard Similarity (Edges): {jaccard_similarity(G1, G2):.4f}
-    '''
+    table_data = [
+        ["Metric", "With Punctuation", "Without Punctuation"],
+        ["Nodes", len(G1.nodes()), len(G2.nodes())],
+        ["Edges", len(G1.edges()), len(G2.edges())],
+        ["Density", f"{graph_density(G1):.4f}", f"{graph_density(G2):.4f}"],
+        ["Clustering Coefficient", f"{clustering_coefficient(G1):.4f}", f"{clustering_coefficient(G2):.4f}"],
+        ["Degree Distribution (top 10)", str(degree_distribution(G1)[:10]), str(degree_distribution(G2)[:10])],
+        ["Slope", f"{get_slope(G1)[0]:.4f}", f"{get_slope(G2)[0]:.4f}"],
+        ["Collocations", str(extract_collocations(G1_nodes, 10)), str(extract_collocations(G2_nodes, 10))],
+        ["Lexical Diversity", f"{lexical_diversity(G1_nodes):.4f}", f"{lexical_diversity(G2_nodes):.4f}"],
+        ["Jaccard Similarity (Edges)", f"{jaccard_similarity(G1, G2):.4f}", ""],
+    ]
 
-    return result
+    return table_data

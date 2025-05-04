@@ -42,7 +42,6 @@ def sentence_tokenize_text(text):
     config = load_config()
     sentence_delimiters = re.compile(r'(?<=[.!?])\s+(?=[A-Z])')
     sentences = re.split(sentence_delimiters, text)
-    print(sentences)
     return [s.strip() for s in sentences if s.strip()]
 
 

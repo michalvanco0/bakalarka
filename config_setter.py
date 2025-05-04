@@ -13,7 +13,12 @@ DEFAULT_CONFIG = {
     "punc_edge_color": "salmon",
     "weighed": False,
     "directed": False,
-    "show_labels": False
+    "show_labels": False,
+    "show_net": False,
+    "min_degree": 0,
+    "show_histogram": False,
+    "show_fit_convergence": False,
+    "show_weibull": True
 }
 
 
