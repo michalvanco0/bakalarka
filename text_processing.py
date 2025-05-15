@@ -1,10 +1,11 @@
 import re
-from config_setter import load_config
+from config_setter import load_config, ALL_PUNCTUATION
 
 
 def tokenize_text(text, keep_punctuation=True):
     config = load_config()
     pattern = f"[{re.escape(config["punctuation_pattern"])}]+"
+    pattern_all = f"[{re.escape(ALL_PUNCTUATION)}]+"
     mode = config["punctuation_mode"]
 
     tokens = []
@@ -31,7 +32,7 @@ def tokenize_text(text, keep_punctuation=True):
 
             tokens.extend(merged_tokens)
         else:
-            cleaned_word = re.sub(pattern, '', word, flags=re.IGNORECASE)
+            cleaned_word = re.sub(pattern_all, '', word, flags=re.IGNORECASE)
             if cleaned_word.strip():
                 tokens.append(cleaned_word.strip())
 
@@ -39,7 +40,6 @@ def tokenize_text(text, keep_punctuation=True):
 
 
 def sentence_tokenize_text(text):
-    config = load_config()
     sentence_delimiters = re.compile(r'(?<=[.!?])\s+(?=[A-Z])')
     sentences = re.split(sentence_delimiters, text)
     return [s.strip() for s in sentences if s.strip()]

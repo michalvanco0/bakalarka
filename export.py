@@ -37,15 +37,13 @@ def export_html(G, filename):
     net.show(filename, notebook=False)
 
 
-def export_pdf(name, results_table=None, results="", histo_fig=None, G1_fig=None, G2_fig=None, extra_figs=None):
-    if extra_figs is None:
-        extra_figs = []
+def export_pdf(name, results_table=None, results_table_2=None, graphs=[]):
 
     pdf_path = name if name.endswith('.pdf') else name + '.pdf'
 
     doc = SimpleDocTemplate(pdf_path, pagesize=A4)
     styles = getSampleStyleSheet()
-    elements = []
+    elements = [Paragraph("Network Analysis", styles['Heading1']), Spacer(1, 12)]
 
     if results_table:
         elements.append(Paragraph("Comparison of Networks", styles['Heading2']))
@@ -62,10 +60,20 @@ def export_pdf(name, results_table=None, results="", histo_fig=None, G1_fig=None
         elements.append(table)
         elements.append(Spacer(1, 12))
 
-    paragraphs = results.strip().split("\n")
-    for p in paragraphs:
-        elements.append(Paragraph(p.strip().replace("  ", "&nbsp; "), styles['Normal']))
-        elements.append(Spacer(1, 6))
+    if results_table_2:
+        stats_table_obj = Table(results_table_2, colWidths=[180, 320])
+        stats_table_obj.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (1, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ]))
+        elements.append(PageBreak())
+        elements.append(Paragraph("Textual Statistics", styles['Heading2']))
+        elements.append(stats_table_obj)
 
     def fig_to_image(fig):
         tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
@@ -73,25 +81,9 @@ def export_pdf(name, results_table=None, results="", histo_fig=None, G1_fig=None
         plt.close(fig)
         return Image(tmp_file.name, width=5.5 * inch, height=4.2 * inch)
 
-    # Add figures
-    if histo_fig:
+    for i, fig in enumerate(graphs):
         elements.append(PageBreak())
-        elements.append(Paragraph("Histogram", styles['Heading2']))
-        elements.append(fig_to_image(histo_fig))
-
-    if G1_fig:
-        elements.append(PageBreak())
-        elements.append(Paragraph("Sieť S interpunkciou (G1)", styles['Heading2']))
-        elements.append(fig_to_image(G1_fig))
-
-    if G2_fig:
-        elements.append(PageBreak())
-        elements.append(Paragraph("Sieť BEZ interpunkcie (G2)", styles['Heading2']))
-        elements.append(fig_to_image(G2_fig))
-
-    for i, fig in enumerate(extra_figs):
-        elements.append(PageBreak())
-        elements.append(Paragraph(f"Extra graf {i + 1}", styles['Heading2']))
+        # elements.append(Paragraph(f"Network {i + 1}", styles['Heading2']))
         elements.append(fig_to_image(fig))
 
     doc.build(elements)

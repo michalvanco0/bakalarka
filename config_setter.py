@@ -1,11 +1,12 @@
 import json
 import os
 
-ALL_PUNCTUATION = "!\"\'()*+,-./:;<=>?[]^_`{|}~»«"
+ALL_PUNCTUATION = "!\"\'()*,—./’“”:;<=>?[]_`{|}~»«..."
+BASIC = '.?!,'
 CONFIG_FILE = "config.json"
 DEFAULT_CONFIG = {
     "punctuation_mode": "split",
-    "punctuation_pattern": "!\"\'()*+,-./:;<=>?[]^_`{|}~»«",
+    "punctuation_pattern": "!\"\'()*,—./’“”:;<=>?[]_`{|}~»«...",
     "save_directory": "C:\\Users\\User\\bakalarka\\bakalarka\\analysis_results",
     "node_color": "black",
     "edge_color": "gray",
@@ -18,7 +19,10 @@ DEFAULT_CONFIG = {
     "min_degree": 0,
     "show_histogram": False,
     "show_fit_convergence": False,
-    "show_weibull": True
+    "show_weibull": False,
+    "show_distribution_comparison": False,
+    "show_models": False,
+    "show_binned": False
 }
 
 

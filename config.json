@@ -1,6 +1,6 @@
 {
     "punctuation_mode": "separate",
-    "punctuation_pattern": "!\"'()*+,-./:;<=>?[]^_`{|}~\u00bb\u00ab",
+    "punctuation_pattern": "!\"'()*,\u2014./\u2019\u201c\u201d:;<=>?[]_`{|}~\u00bb\u00ab...",
     "save_directory": "C:\\Users\\User\\bakalarka\\bakalarka\\analysis_results",
     "node_color": "black",
     "edge_color": "gray",
@@ -8,10 +8,13 @@
     "punc_edge_color": "salmon",
     "weighted": false,
     "directed": false,
-    "show_labels": false,
-    "show_net": false,
-    "min_degree": 0,
-    "show_histogram": true,
+    "show_labels": true,
+    "show_net": true,
+    "min_degree": 60,
+    "show_histogram": false,
     "show_fit_convergence": false,
-    "show_weibull": true
+    "show_weibull": false,
+    "show_distribution_comparison": false,
+    "show_models": true,
+    "show_binned": false
 }

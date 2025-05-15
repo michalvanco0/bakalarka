@@ -1,17 +1,16 @@
 import random
-from collections import Counter
-
+import matplotlib
+# matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
-from pyvis.network import Network
-from scipy.optimize import minimize
-from scipy.stats import weibull_min
-
 import analysis
 import text_processing
 from config_setter import load_config
 from analysis import compute_slope
+from scipy.stats import poisson, geom
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QCheckBox, QScrollArea
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
 NODE_COLOR = 'black'
 EDGE_COLOR = 'gray'
@@ -67,10 +66,10 @@ def plot_networks(Gs, titles):
 
             nx.draw(G, pos, with_labels=show_labels, nodelist=word_nodes, node_color=NODE_COLOR, edgelist=word_edges,
                     edge_color=EDGE_COLOR, node_size=[node_sizes[node] for node in word_nodes],
-                    ax=axs[i])
+                    ax=axs[i], font_color='gray')
             nx.draw(G, pos, with_labels=show_labels, nodelist=punctuation_nodes, node_color=PUNC_NODE_COLOR,
                     edgelist=punctuation_edges, edge_color=PUNC_EDGE_COLOR,
-                    node_size=[node_sizes[node] for node in punctuation_nodes], ax=axs[i])
+                    node_size=[node_sizes[node] for node in punctuation_nodes], ax=axs[i], font_color='gray')
 
             axs[i].set_title(titles[i])
 
@@ -93,33 +92,46 @@ def log_binning(G, bin_count=35):
     return bin_means, bin_counts
 
 
-def plot_logbining(G1, G2):
+def plot_digree_distribution(G1, G2, binned=True, xscale='log', yscale='log'):
     degrees_with = analysis.get_degrees(G1)
     degrees_without = analysis.get_degrees(G2)
-    bin_centers_with, hist_with = analysis.log_bin_degrees(degrees_with)
-    bin_centers_without, hist_without = analysis.log_bin_degrees(degrees_without)
+    title = "Node degree distribution"
+    if binned:
+        title = "Node degree distribution (log-binned)"
+        x_with, y_with = analysis.log_bin_degrees(degrees_with)
+        x_without, y_without = analysis.log_bin_degrees(degrees_without)
+    else:
+        x_with, counts_with = np.unique(degrees_with, return_counts=True)
+        x_without, counts_without = np.unique(degrees_without, return_counts=True)
+        y_with = counts_with / counts_with.sum()
+        y_without = counts_without / counts_without.sum()
 
-    fig, ax = plt.subplots(figsize=(9, 9))
+    fig, ax = plt.subplots(figsize=(7, 7))
+    ax.plot(x_with, y_with, label="include punctuation", color=NODE_COLOR, marker='o')
+    ax.plot(x_without, y_without, label="ignore punctuation", color=PUNC_NODE_COLOR, marker='o')
 
-    ax.plot(bin_centers_with, hist_with, label="S interpunkciou", color=NODE_COLOR, marker='o')
-    ax.plot(bin_centers_without, hist_without, label="Bez interpunkcie", color=PUNC_NODE_COLOR, marker='o')
+    slope_with, intercept_with = compute_slope(x_with, y_with)
+    slope_without, intercept_without = compute_slope(x_without, y_without)
 
-    slope_with, intercept_with = compute_slope(bin_centers_with, hist_with)
-    slope_without, intercept_without = compute_slope(bin_centers_without, hist_without)
+    x_fit_with = np.logspace(np.log10(min(x_with)), np.log10(max(x_with)), 100)
+    x_fit_without = np.logspace(np.log10(min(x_without)), np.log10(max(x_without)), 100)
 
-    ax.plot(bin_centers_with, 10 ** (intercept_with + slope_with * np.log10(bin_centers_with)), NODE_COLOR,
-            label=f"Fit S interpunkciou: {slope_with:.2f}", linestyle=':')
-    ax.plot(bin_centers_without, 10 ** (intercept_without + slope_without * np.log10(bin_centers_without)),
-            PUNC_NODE_COLOR, label=f"Fit Bez interpunkcie: {slope_without:.2f}", linestyle=':')
+    y_fit_with = 10 ** (intercept_with + slope_with * np.log10(x_fit_with))
+    y_fit_without = 10 ** (intercept_without + slope_without * np.log10(x_fit_without))
 
-    ax.set_xscale("log")
-    ax.set_yscale("log")
-    ax.set_xlabel("Stupeň uzla")
-    ax.set_ylabel("Pravdepodobnosť")
+    ax.plot(x_fit_with, y_fit_with, NODE_COLOR, linestyle=':',
+            label=f"Fit (with punct): slope = {slope_with:.2f}")
+    ax.plot(x_fit_without, y_fit_without, PUNC_NODE_COLOR, linestyle=':',
+            label=f"Fit (without punct): slope = {slope_without:.2f}")
+
+    ax.set_xscale(xscale)
+    ax.set_yscale(yscale)
+    ax.set_xlabel("Node degree")
+    ax.set_ylabel("Probability")
     ax.legend()
-    ax.set_title("Log-binned Degree Distribution")
+    ax.set_title(title)
     ax.grid(True)
-
+    plt.show()
     return fig
 
 
@@ -149,15 +161,16 @@ def plot_fit_convergence(results):
     if results is None or len(results) < 2:
         return
     xs, ys = zip(*[(x, y) for x, y in results if y is not None])
-    plt.figure(figsize=(10, 6))
-    plt.plot(xs, ys, marker='o', linestyle='-', color='navy')
-    plt.title("Power-Law Fit Convergence")
-    plt.xlabel("Number of Words in Text")
-    plt.ylabel("Power-Law Slope")
-    plt.grid(True)
-    plt.axhline(ys[-1], color='red', linestyle='--', label=f"Final Fit ≈ {ys[-1]:.2f}")
-    plt.legend()
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.plot(xs, ys, marker='o', linestyle='-', color='navy')
+    ax.set_title("Power-Law")
+    ax.set_xlabel("Word count")
+    ax.set_ylabel("Power-law slope")
+    ax.grid(True)
+    ax.axhline(ys[-1], color='red', linestyle='--', label=f"Final Fit ≈ {ys[-1]:.2f}")
+    ax.legend()
     plt.show()
+    return fig
 
 
 def add_node(G, new_node, edges):
@@ -180,57 +193,131 @@ def dorogov_model(nodes_count):
     return G
 
 
-def get_punctuation_distances(tokens, punctuation_set):
-    distances = []
-    last_index = None
-    for i, token in enumerate(tokens):
-        if token in punctuation_set:
-            if last_index is not None:
-                dist = i - last_index - 1
-                if dist > 0:
-                    distances.append(dist)
-            last_index = i
-    return distances
+def generate_models(nodes_count):
+    models = {
+        "BA": nx.barabasi_albert_graph(nodes_count, 2),
+        "WS": nx.watts_strogatz_graph(nodes_count, 4, 0.3),
+        "Powerlaw Cluster": nx.powerlaw_cluster_graph(nodes_count, 2, 0.5),
+        "Dorogovtsev-Mendes": dorogov_model(nodes_count)
+    }
+    return models
 
 
-def weibull_like_pmf(k, q, beta):
-    return q ** (k ** beta) - q ** ((k + 1) ** beta)
-
-
-def fit_weibull_like_model(distances):
-    if not distances:
-        return None, None, None
-
-    counts = Counter(distances)
-    ks = np.array(sorted(counts.keys()))
-    freqs = np.array([counts[k] for k in ks], dtype=float)
-    freqs /= freqs.sum()  # Normalize
-
-    def loss(params):
-        q, beta = params
-        if not (0 < q < 1) or beta <= 0:
-            return np.inf
-        model = weibull_like_pmf(ks, q, beta)
-        return np.sum((freqs - model) ** 2)
-
-    result = minimize(loss, [0.5, 1.0], bounds=[(1e-5, 1-1e-5), (1e-2, 10)])
-    if result.success:
-        q_fit, beta_fit = result.x
-        return ks, freqs, q_fit, beta_fit
-    else:
-        return ks, freqs, None, None
-
-
-def plot_weibull_like_fit(ks, freqs, q, beta):
-    model_probs = weibull_like_pmf(ks, q, beta)
+def plot_weibull_fit(ks, freqs, q, beta):
+    model_probs = analysis.weibull_pmf(ks, q, beta)
 
     fig, ax = plt.subplots()
-    ax.plot(ks, freqs, 'bo-', label='Empirická distribúcia')
-    ax.plot(ks, model_probs, 'r--', label=f'Weibull-like fit\nq={q:.3f}, β={beta:.3f}')
-    ax.set_title("Distribúcia vzdialeností medzi interpunkciami")
-    ax.set_xlabel("Počet slov medzi interpunkciami (k)")
-    ax.set_ylabel("Pravdepodobnosť")
+    ax.plot(ks, freqs, 'bo-', label='Empirical distribution')
+    ax.plot(ks, model_probs, 'r--', label=f'Weibull fit\np={1 - q:.3f}, β={beta:.3f}')
+    ax.set_title("in-between punctuation word count distribution")
+    ax.set_xlabel("in-between punctuation word count")
+    ax.set_ylabel("Probability")
     ax.legend()
     plt.grid()
     plt.show()
     return fig
+
+
+def plot_distribution_comparisons(ks, freqs, q, beta):
+    model_weibull = analysis.weibull_pmf(ks, q, beta)
+
+    lambda_poisson = analysis.poisson_lambda(ks, freqs)
+    model_poisson = poisson.pmf(ks, mu=lambda_poisson)
+
+    p_geom = analysis.geometric_p(ks, freqs)
+    model_geom = geom.pmf(ks, p=p_geom)
+
+    fig, ax = plt.subplots()
+    ax.plot(ks, freqs, 'bo-', label='Empirical distribution')
+    ax.plot(ks, model_weibull, 'r--', label=f'Weibull fit\np={1 - q:.3f}, β={beta:.3f}')
+    ax.plot(ks, model_poisson, 'g-.', label=f'Poisson fit\nλ={lambda_poisson:.2f}')
+    ax.plot(ks, model_geom, 'm:', label=f'Geometric fit\np={p_geom:.2f}')
+
+    ax.set_title("in-between punctuation word count comparison")
+    ax.set_xlabel("in-between punctuation word count")
+    ax.set_ylabel("Probability")
+    ax.legend()
+    plt.grid()
+    plt.show()
+    return fig
+
+
+def degree_histogram_log(G):
+    degrees = [d for _, d in G.degree()]
+    hist = np.bincount(degrees)
+    x = np.nonzero(hist)[0]
+    y = hist[x]
+    return x, y
+
+
+class ModelPlotWindow(QWidget):
+    def __init__(self, Gs):
+        super().__init__()
+        self.setWindowTitle("Degree Distributions of Models")
+        self.setMinimumSize(800, 600)
+        self.canvas = FigureCanvas(plt.Figure(figsize=(8, 6)))
+        self.ax = self.canvas.figure.subplots()
+        self.ax.set_xscale('log')
+        self.ax.set_yscale('log')
+        self.ax.set_xlabel("Degree (log)")
+        self.ax.set_ylabel("Frequency (log)")
+        self.ax.set_title("Degree Distributions (log-log)")
+        self.plots = {}
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.canvas)
+
+        checkbox_widget = QWidget()
+        checkbox_layout = QVBoxLayout(checkbox_widget)
+
+        for label, G in Gs.items():
+            x, y = degree_histogram_log(G)
+            plot = self.ax.scatter(x, y, label=label, alpha=0.7)
+            fit_line = None
+            if len(x) > 1:
+                log_x = np.log10(x)
+                log_y = np.log10(y)
+                coeffs = np.polyfit(log_x, log_y, 1)
+                slope = coeffs[0]
+                intercept = coeffs[1]
+                label_fit = f"{label} fit (slope={slope:.2f})"
+
+                x_fit = np.linspace(min(x), max(x), 100)
+                y_fit = 10 ** (intercept + slope * np.log10(x_fit))
+                fit_line, = self.ax.plot(x_fit, y_fit, '--', label=label_fit, alpha=0.7)
+            self.plots[label] = (plot, fit_line)
+
+            cb = QCheckBox(label)
+            cb.setChecked(True)
+            cb.stateChanged.connect(lambda state, l=label: self.toggle_visibility(l))
+            checkbox_layout.addWidget(cb)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(checkbox_widget)
+        layout.addWidget(scroll)
+
+        self.canvas.draw()
+        self.setLayout(layout)
+
+    def toggle_visibility(self, label):
+        scatter, fit_line = self.plots[label]
+        visible = not scatter.get_visible()
+        scatter.set_visible(visible)
+        if fit_line:
+            fit_line.set_visible(visible)
+        self.canvas.draw()
+
+
+def show_model_plot_window(Gs):
+    window = ModelPlotWindow(Gs)
+    window.show()
+    return window
+
+
+def compute_slopes(Gs):
+    slopes = {}
+    for label, G in Gs.items():
+        slope = analysis.get_slope(G)[0]
+        slopes[label] = slope
+    return slopes

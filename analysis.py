@@ -1,16 +1,15 @@
 import re
 from collections import Counter
-
 import networkx as nx
 import nltk
 import numpy as np
+from scipy.optimize import minimize
 from scipy.stats import linregress, poisson
 from textstat import textstat
 from nltk.probability import FreqDist
 from nltk import pos_tag, ne_chunk, BigramCollocationFinder, BigramAssocMeasures
 from nltk.tree import Tree
 from textblob import TextBlob
-
 from config_setter import load_config
 from text_processing import tokenize_text, sentence_tokenize_text
 
@@ -18,7 +17,7 @@ from text_processing import tokenize_text, sentence_tokenize_text
 # nltk.download('maxent_ne_chunker_tab')
 # nltk.download('punkt')
 # nltk.download('punkt_tab')
-ALL_PUNCTUATION = '!"\'()*+,-./:;<=>?[\\]^_`{|}~»«'
+
 
 def jaccard_similarity(G1, G2):
     edges1, edges2 = set(G1.edges()), set(G2.edges())
@@ -28,7 +27,6 @@ def jaccard_similarity(G1, G2):
     return intersection / union if union else 0
 
 
-# list
 def degree_distribution(G):
     return sorted([(d, i) for i, d in G.degree()], reverse=True)
 
@@ -52,10 +50,13 @@ def get_degrees(G):
 
 
 def log_bin_degrees(degrees, num_bins=10):
-    min_degree = min(degrees)
-    max_degree = max(degrees)
+    degrees = np.array(degrees)
+    degrees = degrees[degrees > 0]
 
-    bins = np.logspace(np.log10(min_degree), np.log10(max_degree), num_bins)
+    min_degree = degrees.min()
+    max_degree = degrees.max()
+
+    bins = np.logspace(np.log10(min_degree), np.log10(max_degree), num_bins + 1)
     hist, edges = np.histogram(degrees, bins=bins, density=True)
 
     bin_centers = np.sqrt(edges[:-1] * edges[1:])
@@ -65,10 +66,8 @@ def log_bin_degrees(degrees, num_bins=10):
 def compute_slope(x, y):
     log_x = np.log10(x[y > 0])
     log_y = np.log10(y[y > 0])
-
-    slope, intercept, r_value, _, _ = linregress(log_x, log_y)
-    # print(slope, intercept)
-    return slope, intercept
+    coeffs = np.polyfit(log_x, log_y, 1)
+    return coeffs[0], coeffs[1]
 
 
 def get_slope(G):
@@ -144,9 +143,65 @@ def repetition_index(tokens):
     return sum(freq[word] > 1 for word in freq) / len(freq)
 
 
-def ling_analysis(text):
+def get_punctuation_distances(tokens, punctuation_set):
+    distances = []
+    last_index = None
+    for i, token in enumerate(tokens):
+        if token in punctuation_set:
+            if last_index is not None:
+                dist = i - last_index - 1
+                if dist > 0:
+                    distances.append(dist)
+            last_index = i
+    return distances
+
+
+def weibull_pmf(k, q, beta):
+    return q ** (k ** beta) - q ** ((k + 1) ** beta)
+
+
+def poisson_lambda(ks, freqs):
+    return np.sum(ks * freqs)
+
+
+def geometric_p(ks, freqs):
+    return 1 / (np.sum(ks * freqs) + 1)
+
+
+def weibull_fit(distances):
+    if not distances:
+        return None, None, None
+
+    counts = Counter(distances)
+    ks = np.array(sorted(counts.keys()))
+    freqs = np.array([counts[k] for k in ks], dtype=float)
+    freqs /= freqs.sum()
+
+    def loss(params):
+        q, beta = params
+        if not (0 < q < 1) or beta <= 0:
+            return np.inf
+        model = weibull_pmf(ks, q, beta)
+        return np.sum((freqs - model) ** 2)
+
+    result = minimize(loss, [0.5, 1.0], bounds=[(1e-5, 1-1e-5), (1e-2, 10)])
+    if result.success:
+        q_fit, beta_fit = result.x
+        return ks, freqs, q_fit, beta_fit
+    else:
+        return ks, freqs, None, None
+
+
+def get_weibull_parameters(tokens, punctuation_set):
+    distances = get_punctuation_distances(tokens, punctuation_set)
+    ks, freqs, q_fit, beta_fit = weibull_fit(distances)
+    return ks, freqs, q_fit, beta_fit
+
+
+def ling_analysis(text, slopes=None):
     punc_pattern = load_config()["punctuation_pattern"]
     tokens = tokenize_text(text, False)
+    tokens_with = tokenize_text(text, True)
     sent = sentiment(text)
     sentences = sentence_tokenize_text(text)
     sentences_count = len(sentences)
@@ -170,36 +225,41 @@ def ling_analysis(text):
     punct_per_sentence = [sum(1 for char in s if char in punc_pattern) for s in sentences]
     avg_punct_per_sentence = np.mean(punct_per_sentence) if punct_per_sentence else 0
 
-    result = f'''
-    Sentences count: {sentences_count}
-    Average sentence length: {avg_sentence_length(sentences)}
-    Word count: {len(tokens)}
-    Unique word count: {len(set(tokens))}
-    Punctuation count = {punctuation_count}
-    Punctuation density = {punctuation_count / len(text)}
-    Character count: {len(text)}
-    Word frequency (10): {freq(tokens)}
-    Named entities: {ner(tokens)}
-    Sentiment: {"Positive" if sent > 0 else "Negative" if sent < 0 else "Neutral"}
-    Readability: {readability(text)}
-    Syllable count: {textstat.syllable_count(text)}
-    Pos distribution: {pos_distribution(tokens)}
-    Repetition index: {repetition_index(tokens)}
-    punctuation_patterns: {punctuation_patterns}
-    inter_punctuation_distance_avg: {avg_dist}
-    inter_punctuation_distance_min: {min_dist}
-    inter_punctuation_distance_max: {max_dist}
-    punctuation_per_sentence_avg: {avg_punct_per_sentence}
-    terminal_punctuation_frequency: {dict(terminal_counts)}
-    paragraph_count: {len(paragraphs)}
-    avg_paragraph_length: {np.mean([len(p.split()) for p in paragraphs]) if paragraphs else 0} words
-       
-    
-    Power law slope: {power_law_slope}
-    Poisson lambda: {poisson_lambda}
-    '''
+    ks, freqs, q, beta = get_weibull_parameters(tokens_with, punc_pattern)
 
-    return result
+    stats_dict = {
+        "Sentences count": sentences_count,
+        "Average sentence length": avg_sentence_length(sentences),
+        "Word count": len(tokens),
+        "Unique word count": len(set(tokens)),
+        "Punctuation count": punctuation_count,
+        "Punctuation density": punctuation_count / len(text),
+        "Character count": len(text),
+        "Word frequency (top 10)": freq(tokens),
+        "Sentiment": "Positive" if sent > 0 else "Negative" if sent < 0 else "Neutral",
+        "Readability": readability(text),
+        "Syllable count": textstat.syllable_count(text),
+        "POS distribution": pos_distribution(tokens),
+        "Repetition index": repetition_index(tokens),
+        "Punctuation patterns": punctuation_patterns,
+        "Inter-punctuation distance avg": avg_dist,
+        "Inter-punctuation distance min": min_dist,
+        "Inter-punctuation distance max": max_dist,
+        "Punctuation per sentence avg": avg_punct_per_sentence,
+        "Terminal punctuation frequency": dict(terminal_counts),
+        "Paragraph count": len(paragraphs),
+        "Average paragraph length (words)": np.mean([len(p.split()) for p in paragraphs]) if paragraphs else 0,
+        "Power law slope": power_law_slope,
+        "Poisson lambda": poisson_lambda,
+        "p": 1-q,
+        "beta": beta,
+    }
+    if slopes:
+        stats_dict.update(slopes)
+    table_data = [["Metric", "Value"]]
+    for key, value in stats_dict.items():
+        table_data.append([key, str(value)])
+    return table_data
 
 
 def compare_networks(G1, G2):
@@ -214,7 +274,7 @@ def compare_networks(G1, G2):
         ["Degree Distribution (top 10)", str(degree_distribution(G1)[:10]), str(degree_distribution(G2)[:10])],
         ["Slope", f"{get_slope(G1)[0]:.4f}", f"{get_slope(G2)[0]:.4f}"],
         ["Collocations", str(extract_collocations(G1_nodes, 10)), str(extract_collocations(G2_nodes, 10))],
-        ["Lexical Diversity", f"{lexical_diversity(G1_nodes):.4f}", f"{lexical_diversity(G2_nodes):.4f}"],
+        # ["Lexical Diversity", f"{lexical_diversity(G1_nodes):.4f}", f"{lexical_diversity(G2_nodes):.4f}"],
         ["Jaccard Similarity (Edges)", f"{jaccard_similarity(G1, G2):.4f}", ""],
     ]
 
