@@ -49,7 +49,7 @@ def get_degrees(G):
     return [deg for _, deg in G.degree()]
 
 
-def log_bin_degrees(degrees, num_bins=10):
+def log_bin_degrees(degrees, num_bins=15):
     degrees = np.array(degrees)
     degrees = degrees[degrees > 0]
 
@@ -70,10 +70,32 @@ def compute_slope(x, y):
     return coeffs[0], coeffs[1]
 
 
-def get_slope(G):
+# def get_slope(G, min_k=5):
+#     degrees = get_degrees(G)
+#     x, y = log_bin_degrees(degrees)
+#     x = np.array(x)
+#     y = np.array(y)
+#     mask = (x >= min_k) & (y > 0)
+#     if not np.any(mask):
+#         return None, None
+#     return compute_slope(x[mask], y[mask])
+
+
+def get_slope(G, fit_range=(0.2, 0.8)):
     degrees = get_degrees(G)
     bin_centers, hist = log_bin_degrees(degrees)
-    return compute_slope(bin_centers, hist)
+
+    valid = hist > 0
+    x, y = bin_centers[valid], hist[valid]
+
+    n = len(x)
+    i_start = int(fit_range[0] * n)
+    i_end = int(fit_range[1] * n)
+    x_fit, y_fit = x[i_start:i_end], y[i_start:i_end]
+
+    slope, intercept = compute_slope(x_fit, y_fit)
+    return slope, intercept
+
 
 
 def freq(tokens):

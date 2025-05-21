@@ -1,4 +1,6 @@
 import random
+from collections import Counter
+
 import matplotlib
 # matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
@@ -107,22 +109,27 @@ def plot_digree_distribution(G1, G2, binned=True, xscale='log', yscale='log'):
         y_without = counts_without / counts_without.sum()
 
     fig, ax = plt.subplots(figsize=(7, 7))
-    ax.plot(x_with, y_with, label="include punctuation", color=NODE_COLOR, marker='o')
-    ax.plot(x_without, y_without, label="ignore punctuation", color=PUNC_NODE_COLOR, marker='o')
+    ax.scatter(x_with, y_with, label="include punctuation", color=NODE_COLOR, marker='o')
+    ax.scatter(x_without, y_without, label="ignore punctuation", color=PUNC_NODE_COLOR, marker='o')
 
-    slope_with, intercept_with = compute_slope(x_with, y_with)
-    slope_without, intercept_without = compute_slope(x_without, y_without)
+    slope_with, intercept_with = analysis.get_slope(G1, fit_range=(0.2, 0.8))
+    slope_without, intercept_without = analysis.get_slope(G2, fit_range=(0.2, 0.8))
 
-    x_fit_with = np.logspace(np.log10(min(x_with)), np.log10(max(x_with)), 100)
-    x_fit_without = np.logspace(np.log10(min(x_without)), np.log10(max(x_without)), 100)
+    if slope_with is not None:
+        x_log = np.log10(np.array(x_with)[(np.array(x_with) > 0) & (np.array(y_with) > 0)])
+        fit_min, fit_max = np.percentile(x_log, [20, 80])
+        x_fit_with = np.logspace(fit_min, fit_max, 100)
+        y_fit_with = 10 ** (intercept_with + slope_with * np.log10(x_fit_with))
+        ax.plot(x_fit_with, y_fit_with, NODE_COLOR, linestyle='-',
+                label=f"Fit (with punct): {slope_with:.2f}")
 
-    y_fit_with = 10 ** (intercept_with + slope_with * np.log10(x_fit_with))
-    y_fit_without = 10 ** (intercept_without + slope_without * np.log10(x_fit_without))
-
-    ax.plot(x_fit_with, y_fit_with, NODE_COLOR, linestyle=':',
-            label=f"Fit (with punct): slope = {slope_with:.2f}")
-    ax.plot(x_fit_without, y_fit_without, PUNC_NODE_COLOR, linestyle=':',
-            label=f"Fit (without punct): slope = {slope_without:.2f}")
+    if slope_without is not None:
+        x_log = np.log10(np.array(x_without)[(np.array(x_without) > 0) & (np.array(y_without) > 0)])
+        fit_min, fit_max = np.percentile(x_log, [20, 80])
+        x_fit_without = np.logspace(fit_min, fit_max, 100)
+        y_fit_without = 10 ** (intercept_without + slope_without * np.log10(x_fit_without))
+        ax.plot(x_fit_without, y_fit_without, PUNC_NODE_COLOR, linestyle=':',
+                label=f"Fit (without punct): {slope_without:.2f}")
 
     ax.set_xscale(xscale)
     ax.set_yscale(yscale)
@@ -173,32 +180,48 @@ def plot_fit_convergence(results):
     return fig
 
 
-def add_node(G, new_node, edges):
-    edge = random.choice(edges)
-    u, v = edge
-    G.add_node(new_node)
-    G.add_edge(new_node, u)
-    G.add_edge(new_node, v)
+# def add_node(G, new_node, alpha=0):
+#     degrees = np.array([G.degree(n) for n in G.nodes()])
+#     degrees = np.power(degrees, alpha)
+#     probs = degrees / degrees.sum()
+#     nodes = list(G.nodes())
+#     chosen = np.random.choice(nodes, p=probs)
+#
+#     neighbors = list(G.neighbors(chosen))
+#     second = random.choice(neighbors) if neighbors else random.choice(nodes)
+#
+#     G.add_node(new_node)
+#     G.add_edge(new_node, chosen)
+#     G.add_edge(new_node, second)
+
+def add_node(G, new_node, alpha=1.4, m=2):
+    degrees = np.array([G.degree(node) for node in G.nodes()])
+    probs = degrees ** alpha
+    probs = probs / probs.sum()
+    targets = np.random.choice(list(G.nodes()), size=m, replace=False, p=probs)
+    for target in targets:
+        G.add_edge(new_node, target)
 
 
 def dorogov_model(nodes_count):
     G = nx.Graph()
-    G.add_node(0)
-    G.add_node(1)
     G.add_edge(0, 1)
-    edges = list(G.edges())
-    for _ in range(nodes_count):
-        new_node = len(G.nodes())
-        add_node(G, new_node, edges)
+    G.add_edge(1, 2)
+    G.add_edge(2, 0)
+
+    for _ in range(3, nodes_count):
+        add_node(G, new_node=_)
+
     return G
 
 
 def generate_models(nodes_count):
     models = {
-        "BA": nx.barabasi_albert_graph(nodes_count, 2),
-        "WS": nx.watts_strogatz_graph(nodes_count, 4, 0.3),
+        "Barabási-Albert": nx.barabasi_albert_graph(nodes_count, 2),
+        # "Watts-Strogatz": nx.watts_strogatz_graph(nodes_count, 4, 0.3),
         "Powerlaw Cluster": nx.powerlaw_cluster_graph(nodes_count, 2, 0.5),
         "Dorogovtsev-Mendes": dorogov_model(nodes_count)
+        # "Dorogovtsev-Mendes": nx.dorogovtsev_goltsev_mendes_graph(nodes_count)
     }
     return models
 
@@ -242,12 +265,33 @@ def plot_distribution_comparisons(ks, freqs, q, beta):
     return fig
 
 
-def degree_histogram_log(G):
+def degree_histogram_log(G, bin_count=35):
     degrees = [d for _, d in G.degree()]
-    hist = np.bincount(degrees)
-    x = np.nonzero(hist)[0]
-    y = hist[x]
-    return x, y
+    if not degrees:
+        return np.array([]), np.array([])
+
+    max_exp = np.log10(max(degrees))
+    min_exp = np.log10(min(d for d in degrees if d > 0))  # avoid log10(0)
+    bins = np.logspace(min_exp, max_exp, bin_count)
+
+    bin_counts, edges = np.histogram(degrees, bins=bins)
+    bin_centers = np.sqrt(edges[:-1] * edges[1:])
+
+    total = bin_counts.sum()
+    probs = bin_counts / total if total > 0 else np.zeros_like(bin_counts)
+
+    mask = probs > 0
+    return bin_centers[mask], probs[mask]
+
+
+def fit_power_law(x, y, min_k=5):
+    mask = (x >= min_k) & (y > 0)
+    if not np.any(mask):
+        return None, None
+    log_x = np.log10(x[mask])
+    log_y = np.log10(y[mask])
+    coeffs = np.polyfit(log_x, log_y, 1)
+    return coeffs[0], coeffs[1]
 
 
 class ModelPlotWindow(QWidget):
@@ -260,7 +304,7 @@ class ModelPlotWindow(QWidget):
         self.ax.set_xscale('log')
         self.ax.set_yscale('log')
         self.ax.set_xlabel("Degree (log)")
-        self.ax.set_ylabel("Frequency (log)")
+        self.ax.set_ylabel("Probability (log)")
         self.ax.set_title("Degree Distributions (log-log)")
         self.plots = {}
 
@@ -271,23 +315,32 @@ class ModelPlotWindow(QWidget):
         checkbox_layout = QVBoxLayout(checkbox_widget)
 
         for label, G in Gs.items():
-            x, y = degree_histogram_log(G)
-            plot = self.ax.scatter(x, y, label=label, alpha=0.7)
-            fit_line = None
-            if len(x) > 1:
-                log_x = np.log10(x)
-                log_y = np.log10(y)
-                coeffs = np.polyfit(log_x, log_y, 1)
-                slope = coeffs[0]
-                intercept = coeffs[1]
-                label_fit = f"{label} fit (slope={slope:.2f})"
+            degrees = analysis.get_degrees(G)
+            x, y = analysis.log_bin_degrees(degrees)
+            x = np.array(x, dtype=float)
+            y = np.array(y, dtype=float)
 
-                x_fit = np.linspace(min(x), max(x), 100)
+            mask = (x >= 5) & (y > 0)
+            if not np.any(mask):
+                slope, intercept = None, None
+            else:
+                slope, intercept = analysis.get_slope(G, fit_range=(0.2, 0.8))
+
+            plot = self.ax.scatter(x, y, label=label, alpha=0.7)
+
+            fit_line = None
+            if slope is not None:
+                mask = (x > 0) & (y > 0)
+                x_log = np.log10(x[mask])
+                p_min, p_max = np.percentile(x_log, [20, 80])
+                x_fit = np.logspace(p_min, p_max, 100)
                 y_fit = 10 ** (intercept + slope * np.log10(x_fit))
-                fit_line, = self.ax.plot(x_fit, y_fit, '--', label=label_fit, alpha=0.7)
+                fit_line, = self.ax.plot(x_fit, y_fit, '--', label=f"{label} fit", alpha=0.7)
+
             self.plots[label] = (plot, fit_line)
 
-            cb = QCheckBox(label)
+            cb_label = f"{label} ({slope:.2f})" if slope is not None else label
+            cb = QCheckBox(cb_label)
             cb.setChecked(True)
             cb.stateChanged.connect(lambda state, l=label: self.toggle_visibility(l))
             checkbox_layout.addWidget(cb)

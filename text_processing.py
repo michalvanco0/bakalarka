@@ -18,15 +18,14 @@ def tokenize_text(text, keep_punctuation=True):
 
             for part in split_parts:
                 if part and re.fullmatch(pattern, part):
-                    if mode == "merged":
-                        if merged_tokens and re.fullmatch(pattern, merged_tokens[-1]):
-                            merged_tokens[-1] += part
-                        else:
-                            merged_tokens.append(part)
-                    elif mode == "single":
-                        merged_tokens.append(".")
-                    elif mode == "separate":
-                        merged_tokens.append(part)
+                    smart_parts = split_punctuation(part)
+                    for sp in smart_parts:
+                        if mode == "merged":
+                            merged_tokens.append(sp)
+                        elif mode == "single":
+                            merged_tokens.append(".")
+                        elif mode == "separate":
+                            merged_tokens.extend(list(sp))
                 elif part.strip():
                     merged_tokens.append(part)
 
@@ -37,6 +36,20 @@ def tokenize_text(text, keep_punctuation=True):
                 tokens.append(cleaned_word.strip())
 
     return tokens
+
+
+def split_punctuation(punct_string):
+    groups = []
+    current = punct_string[0]
+
+    for ch in punct_string[1:]:
+        if ch == current[-1]:
+            current += ch
+        else:
+            groups.append(current)
+            current = ch
+    groups.append(current)
+    return groups
 
 
 def sentence_tokenize_text(text):

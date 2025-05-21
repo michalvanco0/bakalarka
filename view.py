@@ -1,3 +1,5 @@
+import html
+import ast
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QWidget, QPushButton, QLabel, QFileDialog, QVBoxLayout, QTextEdit, QButtonGroup, \
     QRadioButton, QLineEdit, QCheckBox, QLabel, QHBoxLayout, QSlider
@@ -239,17 +241,17 @@ class GraphAnalysisApp(QWidget):
                     [self.G1, self.G2],["Network with punctuation", "Network without punctuation"]))
             if config["show_binned"]:
                 self.plotted_graphs.append(plot_digree_distribution(self.G1, self.G2))
-                self.plotted_graphs.append(plot_digree_distribution(self.G1, self.G2, binned=True,
-                                                                    xscale="linear", yscale="log"))
-                self.plotted_graphs.append(plot_digree_distribution(self.G1, self.G2, binned=True,
-                                                                    xscale="linear", yscale="linear"))
+                # self.plotted_graphs.append(plot_digree_distribution(self.G1, self.G2, binned=True,
+                #                                                     xscale="linear", yscale="log"))
+                # self.plotted_graphs.append(plot_digree_distribution(self.G1, self.G2, binned=True,
+                #                                                     xscale="linear", yscale="linear"))
             if config["show_histogram"]:
                 self.plotted_graphs.append(plot_digree_distribution(self.G1, self.G2, binned=False,
                                                                     xscale="log", yscale="log"))
-                self.plotted_graphs.append(plot_digree_distribution(self.G1, self.G2, binned=False,
-                                                                    xscale="linear", yscale="log"))
-                self.plotted_graphs.append(plot_digree_distribution(self.G1, self.G2, binned=False,
-                                                                    xscale="linear", yscale="linear"))
+                # self.plotted_graphs.append(plot_digree_distribution(self.G1, self.G2, binned=False,
+                #                                                     xscale="linear", yscale="log"))
+                # self.plotted_graphs.append(plot_digree_distribution(self.G1, self.G2, binned=False,
+                #                                                     xscale="linear", yscale="linear"))
             if config["show_models"]:
                 self.model_window = network.show_model_plot_window(models)
                 # self.plotted_graphs.append(self.model_window)
@@ -322,8 +324,39 @@ class GraphAnalysisApp(QWidget):
         QTimer.singleShot(duration, snackbar.close)
 
 
+def format_value(value):
+    if isinstance(value, str):
+        try:
+            value = ast.literal_eval(value)
+        except Exception:
+            return html.escape(value)
+
+    if isinstance(value, dict):
+        return "<ul>" + "".join(
+            f"<li><b>{html.escape(str(k))}</b>: {html.escape(str(v))}</li>" for k, v in value.items()
+        ) + "</ul>"
+
+    elif isinstance(value, list):
+        # Collocations: list of ((str, str), float)
+        if all(isinstance(i, tuple) and isinstance(i[0], tuple) and len(i[0]) == 2 for i in value):
+            return "<ul>" + "".join(
+                f"<li>{html.escape(i[0][0])} {html.escape(i[0][1])} — {i[1]:.4f}</li>" for i in value
+            ) + "</ul>"
+        elif all(isinstance(i, tuple) and len(i) == 2 for i in value):
+            return "<ul>" + "".join(
+                f"<li>{html.escape(str(i[0]))}: {html.escape(str(i[1]))}</li>" for i in value
+            ) + "</ul>"
+        else:
+            return "<ul>" + "".join(f"<li>{html.escape(str(item))}</li>" for item in value) + "</ul>"
+
+    elif isinstance(value, float):
+        return f"{value:.4f}"
+
+    return html.escape(str(value))
+
+
 def table_to_html(*table_datas):
-    html = '''
+    output = '''
     <style>
     table { border-collapse: collapse; width: 100%; }
     th, td { 
@@ -339,14 +372,14 @@ def table_to_html(*table_datas):
     '''
     for table_data in table_datas:
         for i, row in enumerate(table_data):
-            html += "<tr>"
+            output += "<tr>"
             for cell in row:
                 tag = "th" if i == 0 else "td"
-                html += f"<{tag}>{cell}</{tag}>"
-            html += "</tr>"
-        html += "</table>"
-        html += "<br>"
-    return html
+                output += f"<{tag}>{format_value(cell)}</{tag}>"
+            output += "</tr>"
+        output += "</table>"
+        output += "<br>"
+    return output
 
 
 def table_for_pdf(table_data):
