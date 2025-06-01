@@ -65,4 +65,4 @@ Aplikácia používa tzv. snackbary na zobrazovanie správ, napríklad:
  - No file chosen! – nebol vybraný žiadny vstupný súbor
  - Analysis unsuccessful – pri analýze nastala chyba
  - Saved PDF – export do PDF bol úspešný
- - Error during CSV export – export do CSV zly
+ - Error during CSV export – export do CSV zlyhal
