@@ -23,7 +23,6 @@ def jaccard_similarity(G1, G2):
     edges1, edges2 = set(G1.edges()), set(G2.edges())
     intersection = len(edges1 & edges2)
     union = len(edges1 | edges2)
-    # return nx.jaccard_coefficient(G1, G2) if union else 0
     return intersection / union if union else 0
 
 
@@ -52,39 +51,28 @@ def get_degrees(G):
 def log_bin_degrees(degrees, num_bins=15):
     degrees = np.array(degrees)
     degrees = degrees[degrees > 0]
+    if degrees.size == 0:
+        return np.array([]), np.array([])
 
     min_degree = degrees.min()
     max_degree = degrees.max()
-
     bins = np.logspace(np.log10(min_degree), np.log10(max_degree), num_bins + 1)
     hist, edges = np.histogram(degrees, bins=bins, density=True)
-
     bin_centers = np.sqrt(edges[:-1] * edges[1:])
+
     return bin_centers, hist
 
 
 def compute_slope(x, y):
     log_x = np.log10(x[y > 0])
     log_y = np.log10(y[y > 0])
-    coeffs = np.polyfit(log_x, log_y, 1)
-    return coeffs[0], coeffs[1]
-
-
-# def get_slope(G, min_k=5):
-#     degrees = get_degrees(G)
-#     x, y = log_bin_degrees(degrees)
-#     x = np.array(x)
-#     y = np.array(y)
-#     mask = (x >= min_k) & (y > 0)
-#     if not np.any(mask):
-#         return None, None
-#     return compute_slope(x[mask], y[mask])
+    slope, intercept = np.polyfit(log_x, log_y, 1)
+    return slope, intercept
 
 
 def get_slope(G, fit_range=(0.2, 0.8)):
     degrees = get_degrees(G)
     bin_centers, hist = log_bin_degrees(degrees)
-
     valid = hist > 0
     x, y = bin_centers[valid], hist[valid]
 
@@ -95,7 +83,6 @@ def get_slope(G, fit_range=(0.2, 0.8)):
 
     slope, intercept = compute_slope(x_fit, y_fit)
     return slope, intercept
-
 
 
 def freq(tokens):
@@ -206,7 +193,7 @@ def weibull_fit(distances):
         model = weibull_pmf(ks, q, beta)
         return np.sum((freqs - model) ** 2)
 
-    result = minimize(loss, [0.5, 1.0], bounds=[(1e-5, 1-1e-5), (1e-2, 10)])
+    result = minimize(loss, [0.5, 1.0], bounds=[(1e-5, 1 - 1e-5), (1e-2, 10)])
     if result.success:
         q_fit, beta_fit = result.x
         return ks, freqs, q_fit, beta_fit
@@ -221,19 +208,19 @@ def get_weibull_parameters(tokens, punctuation_set):
 
 
 def ling_analysis(text, slopes=None):
-    punc_pattern = load_config()["punctuation_pattern"]
+    config = load_config()
+    punc_pattern = config["punctuation_pattern"]
     tokens = tokenize_text(text, False)
     tokens_with = tokenize_text(text, True)
-    sent = sentiment(text)
+    sentiment_score = sentiment(text)
     sentences = sentence_tokenize_text(text)
     sentences_count = len(sentences)
+    paragraphs = [p.strip() for p in text.split('\n\n') if p.strip()]
+
     punctuation_count = sum(1 for char in text if char in punc_pattern)
     escaped_pattern = re.escape(punc_pattern)
     regex_pattern = r'[' + escaped_pattern + r']'
     punctuation_patterns = Counter(re.findall(regex_pattern, text))
-    power_law_slope, power_law_intercept = compute_power_law(punctuation_patterns)
-    poisson_lambda, poisson_fit = compute_poisson_fit(punctuation_patterns, sentences_count)
-    paragraphs = [p.strip() for p in text.split('\n\n') if p.strip()]
     terminal_counts = Counter(s.strip()[-1] for s in sentences if s.strip()[-1] in ".!?")
     punct_indices = [i for i, c in enumerate(text) if c in punc_pattern]
     inter_punct_distances = [j - i for i, j in zip(punct_indices[:-1], punct_indices[1:])]
@@ -249,6 +236,9 @@ def ling_analysis(text, slopes=None):
 
     ks, freqs, q, beta = get_weibull_parameters(tokens_with, punc_pattern)
 
+    power_law_slope, power_law_intercept = compute_power_law(punctuation_patterns)
+    poisson_lambda, poisson_fit = compute_poisson_fit(punctuation_patterns, sentences_count)
+
     stats_dict = {
         "Sentences count": sentences_count,
         "Average sentence length": avg_sentence_length(sentences),
@@ -258,7 +248,7 @@ def ling_analysis(text, slopes=None):
         "Punctuation density": punctuation_count / len(text),
         "Character count": len(text),
         "Word frequency (top 10)": freq(tokens),
-        "Sentiment": "Positive" if sent > 0 else "Negative" if sent < 0 else "Neutral",
+        "Sentiment": "Positive" if sentiment_score > 0 else "Negative" if sentiment_score < 0 else "Neutral",
         "Readability": readability(text),
         "Syllable count": textstat.syllable_count(text),
         "POS distribution": pos_distribution(tokens),
@@ -273,8 +263,8 @@ def ling_analysis(text, slopes=None):
         "Average paragraph length (words)": np.mean([len(p.split()) for p in paragraphs]) if paragraphs else 0,
         "Power law slope": power_law_slope,
         "Poisson lambda": poisson_lambda,
-        "p": 1-q,
-        "beta": beta,
+        "Weibull p": 1 - q,
+        "Weibull beta": beta,
     }
     if slopes:
         stats_dict.update(slopes)
@@ -296,7 +286,6 @@ def compare_networks(G1, G2):
         ["Degree Distribution (top 10)", str(degree_distribution(G1)[:10]), str(degree_distribution(G2)[:10])],
         ["Slope", f"{get_slope(G1)[0]:.4f}", f"{get_slope(G2)[0]:.4f}"],
         ["Collocations", str(extract_collocations(G1_nodes, 10)), str(extract_collocations(G2_nodes, 10))],
-        # ["Lexical Diversity", f"{lexical_diversity(G1_nodes):.4f}", f"{lexical_diversity(G2_nodes):.4f}"],
         ["Jaccard Similarity (Edges)", f"{jaccard_similarity(G1, G2):.4f}", ""],
     ]
 

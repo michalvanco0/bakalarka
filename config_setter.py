@@ -7,7 +7,7 @@ CONFIG_FILE = "config.json"
 DEFAULT_CONFIG = {
     "punctuation_mode": "split",
     "punctuation_pattern": "!\"\'()*,—./’“”:;<=>?[]_`{|}~»«...",
-    "save_directory": "C:\\Users\\User\\bakalarka\\bakalarka\\analysis_results",
+    "save_directory": "root_directory",
     "node_color": "black",
     "edge_color": "gray",
     "punc_node_color": "red",

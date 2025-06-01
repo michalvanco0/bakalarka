@@ -4,7 +4,7 @@ from config_setter import load_config, ALL_PUNCTUATION
 
 def tokenize_text(text, keep_punctuation=True):
     config = load_config()
-    pattern = f"[{re.escape(config["punctuation_pattern"])}]+"
+    pattern = f"[{re.escape(config['punctuation_pattern'])}]+"
     pattern_all = f"[{re.escape(ALL_PUNCTUATION)}]+"
     mode = config["punctuation_mode"]
 

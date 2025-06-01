@@ -1,8 +1,3 @@
-import random
-from collections import Counter
-
-import matplotlib
-# matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
@@ -82,24 +77,12 @@ def plot_networks(Gs, titles):
     return fig
 
 
-def log_binning(G, bin_count=35):
-    data = [d for n, d in G.degree()]
-    max_exp = np.log10(max(data))
-    min_exp = np.log10(min(data))
-    bins = np.logspace(min_exp, max_exp, bin_count)
-
-    bin_means = (bins[:-1] + bins[1:]) / 2.0
-    bin_counts, _ = np.histogram(data, bins=bins)
-
-    return bin_means, bin_counts
-
-
 def plot_digree_distribution(G1, G2, binned=True, xscale='log', yscale='log'):
     degrees_with = analysis.get_degrees(G1)
     degrees_without = analysis.get_degrees(G2)
     title = "Node degree distribution"
     if binned:
-        title = "Node degree distribution (log-binned)"
+        title = "Node degree distribution (binned)"
         x_with, y_with = analysis.log_bin_degrees(degrees_with)
         x_without, y_without = analysis.log_bin_degrees(degrees_without)
     else:
@@ -180,20 +163,6 @@ def plot_fit_convergence(results):
     return fig
 
 
-# def add_node(G, new_node, alpha=0):
-#     degrees = np.array([G.degree(n) for n in G.nodes()])
-#     degrees = np.power(degrees, alpha)
-#     probs = degrees / degrees.sum()
-#     nodes = list(G.nodes())
-#     chosen = np.random.choice(nodes, p=probs)
-#
-#     neighbors = list(G.neighbors(chosen))
-#     second = random.choice(neighbors) if neighbors else random.choice(nodes)
-#
-#     G.add_node(new_node)
-#     G.add_edge(new_node, chosen)
-#     G.add_edge(new_node, second)
-
 def add_node(G, new_node, alpha=1.4, m=2):
     degrees = np.array([G.degree(node) for node in G.nodes()])
     probs = degrees ** alpha
@@ -221,7 +190,6 @@ def generate_models(nodes_count):
         # "Watts-Strogatz": nx.watts_strogatz_graph(nodes_count, 4, 0.3),
         "Powerlaw Cluster": nx.powerlaw_cluster_graph(nodes_count, 2, 0.5),
         "Dorogovtsev-Mendes": dorogov_model(nodes_count)
-        # "Dorogovtsev-Mendes": nx.dorogovtsev_goltsev_mendes_graph(nodes_count)
     }
     return models
 
@@ -263,35 +231,6 @@ def plot_distribution_comparisons(ks, freqs, q, beta):
     plt.grid()
     plt.show()
     return fig
-
-
-def degree_histogram_log(G, bin_count=35):
-    degrees = [d for _, d in G.degree()]
-    if not degrees:
-        return np.array([]), np.array([])
-
-    max_exp = np.log10(max(degrees))
-    min_exp = np.log10(min(d for d in degrees if d > 0))  # avoid log10(0)
-    bins = np.logspace(min_exp, max_exp, bin_count)
-
-    bin_counts, edges = np.histogram(degrees, bins=bins)
-    bin_centers = np.sqrt(edges[:-1] * edges[1:])
-
-    total = bin_counts.sum()
-    probs = bin_counts / total if total > 0 else np.zeros_like(bin_counts)
-
-    mask = probs > 0
-    return bin_centers[mask], probs[mask]
-
-
-def fit_power_law(x, y, min_k=5):
-    mask = (x >= min_k) & (y > 0)
-    if not np.any(mask):
-        return None, None
-    log_x = np.log10(x[mask])
-    log_y = np.log10(y[mask])
-    coeffs = np.polyfit(log_x, log_y, 1)
-    return coeffs[0], coeffs[1]
 
 
 class ModelPlotWindow(QWidget):

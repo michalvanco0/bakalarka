@@ -15,68 +15,48 @@ from export import export_csv, export_html, export_pdf
 from config_setter import update_config, load_config, ALL_PUNCTUATION, BASIC
 
 
+def style_button(button):
+    button.setStyleSheet("""
+        QPushButton {
+           background-color: #4CAF50;
+           color: white;
+           padding: 10px 20px;
+           border-radius: 5px;
+        }
+        QPushButton:hover {
+            background-color: #45a049;
+        }
+           """)
+
+
 class GraphAnalysisApp(QWidget):
     def __init__(self):
         super().__init__()
-        self.show_binned_checkbox = None
-        self.model_window = None
-        self.show_models_checkbox = None
-        self.show_distribution_comparison_checkbox = None
-        self.pict_label = None
-        self.image = None
-        self.show_weibull_checkbox = None
+        self.G1 = None
+        self.G2 = None
         self.table = None
         self.table_2 = None
-        self.show_fit_convergence_checkbox = None
-        self.show_histogram_checkbox = None
-        self.degree_value = None
-        self.degree_slider = None
-        self.filter_nodes_checkbox = None
-        self.show_net_checkbox = None
-        self.label_checkbox = None
         self.plotted_graphs = []
-        self.btn_save = None
-        self.btn_analyze = None
-        self.custom_input = None
-        self.rb3 = None
-        self.rb2 = None
-        self.rb1 = None
-        self.radio_group = None
-        self.btn_select = None
-        self.label = None
-        self.results = None
-        self.G2 = None
-        self.G1 = None
         self.file_path = "No file"
-        self.initUI()
+        self.initialize_gui()
 
-    def initUI(self):
+    def initialize_gui(self):
         self.setWindowTitle("Punctuation Network Analyzer")
         self.setGeometry(100, 100, 800, 600)
         self.setWindowIcon(QIcon("logo1.png"))
+
         self.label = QLabel("SELECT FILE")
         self.btn_select = QPushButton("SEARCH FILES")
         self.btn_select.clicked.connect(self.select_file)
-        self.btn_select.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50; 
-                color: white; 
-                padding: 10px 20px; 
-                border-radius: 5px; 
-            }
-            QPushButton:hover {
-                background-color: #45a049;
-            }
-        """)
+        style_button(self.btn_select)
 
         self.radio_group = QButtonGroup(self)
         self.rb1 = QRadioButton(ALL_PUNCTUATION, self)
         self.rb1.setChecked(True)
         self.rb2 = QRadioButton(BASIC, self)
         self.rb3 = QRadioButton("Custom", self)
-        self.radio_group.addButton(self.rb1, 1)
-        self.radio_group.addButton(self.rb2, 2)
-        self.radio_group.addButton(self.rb3, 3)
+        for i, rb in enumerate([self.rb1, self.rb2, self.rb3], start=1):
+            self.radio_group.addButton(rb, i)
         self.custom_input = QLineEdit(self)
         self.custom_input.setPlaceholderText("...")
         self.custom_input.setEnabled(False)
@@ -90,6 +70,7 @@ class GraphAnalysisApp(QWidget):
         self.show_fit_convergence_checkbox = QCheckBox("Fit convergence", self)
         self.show_weibull_checkbox = QCheckBox("Weibull Distribution", self)
         self.show_distribution_comparison_checkbox = QCheckBox("Distribution comparison", self)
+
         self.degree_slider = QSlider(Qt.Orientation.Horizontal)
         self.degree_slider.setMinimum(0)
         self.degree_slider.setMaximum(100)
@@ -99,79 +80,61 @@ class GraphAnalysisApp(QWidget):
 
         self.btn_analyze = QPushButton("Analyze text")
         self.btn_analyze.clicked.connect(self.analyze_text)
-        self.btn_analyze.setStyleSheet("""
-            QPushButton {
-               background-color: #4CAF50;
-               color: white;
-               padding: 10px 20px;
-               border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #45a049;
-            }
-               """)
+        style_button(self.btn_analyze)
 
         self.results = QTextEdit()
         self.results.setReadOnly(True)
 
-        self.btn_export_csv_G1 = QPushButton("Export G1 into CSV")
-        self.btn_export_csv_G1.clicked.connect(lambda: self.export_csv_dialog(self.G1))
-
-        self.btn_export_csv_G2 = QPushButton("Export G2 into CSV")
-        self.btn_export_csv_G2.clicked.connect(lambda: self.export_csv_dialog(self.G2))
-
-        self.btn_export_html_G1 = QPushButton("Export G1 into HTML")
-        self.btn_export_html_G1.clicked.connect(lambda: self.export_html_dialog(self.G1))
-
-        self.btn_export_html_G2 = QPushButton("Export G2 into HTML")
-        self.btn_export_html_G2.clicked.connect(lambda: self.export_html_dialog(self.G2))
+        self.btn_export_csv_G1 = self.create_export_button("Export G1 into CSV", lambda: self.export_csv_dialog(self.G1))
+        self.btn_export_csv_G2 = self.create_export_button("Export G2 into CSV", lambda: self.export_csv_dialog(self.G2))
+        self.btn_export_html_G1 = self.create_export_button(
+            "Export G1 into HTML", lambda: self.export_html_dialog(self.G1))
+        self.btn_export_html_G2 = self.create_export_button(
+            "Export G2 into HTML", lambda: self.export_html_dialog(self.G2))
 
         self.btn_save = QPushButton("Save analysis")
         self.btn_save.clicked.connect(self.save_analysis)
-        self.btn_save.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50; 
-                color: white; 
-                padding: 10px 20px; 
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #45a049;
-            }
-        """)
+        style_button(self.btn_save)
 
+        self.build_layout()
+
+    def create_export_button(self, label, callback):
+        button = QPushButton(label)
+        button.clicked.connect(callback)
+        return button
+
+    def build_layout(self):
         layout = QHBoxLayout()
-        layout1 = QVBoxLayout()
-        layout2 = QVBoxLayout()
-        layout3 = QVBoxLayout()
-        layout4 = QHBoxLayout()
-        layout1.addWidget(self.pict_label)
-        layout1.addWidget(self.label)
-        layout1.addWidget(self.btn_select)
-        layout2.addWidget(self.rb1)
-        layout2.addWidget(self.rb2)
-        layout2.addWidget(self.rb3)
-        layout2.addWidget(self.custom_input)
-        layout3.addWidget(self.label_checkbox)
-        layout3.addWidget(self.show_net_checkbox)
-        layout3.addWidget(self.show_histogram_checkbox)
-        layout3.addWidget(self.show_binned_checkbox)
-        layout3.addWidget(self.show_models_checkbox)
-        layout3.addWidget(self.show_fit_convergence_checkbox)
-        layout3.addWidget(self.show_weibull_checkbox)
-        layout3.addWidget(self.show_distribution_comparison_checkbox)
-        layout3.addWidget(self.degree_slider)
-        layout3.addWidget(self.degree_value)
-        layout4.addLayout(layout2)
-        layout4.addLayout(layout3)
-        layout1.addLayout(layout4)
-        layout1.addWidget(self.btn_analyze)
-        layout1.addWidget(self.btn_export_csv_G1)
-        layout1.addWidget(self.btn_export_csv_G2)
-        layout1.addWidget(self.btn_export_html_G1)
-        layout1.addWidget(self.btn_export_html_G2)
-        layout1.addWidget(self.btn_save)
-        layout.addLayout(layout1)
+        left_col = QVBoxLayout()
+        radio_group = QVBoxLayout()
+        checkbox_group = QVBoxLayout()
+        configuration = QHBoxLayout()
+
+        radio_group.addWidget(self.rb1)
+        radio_group.addWidget(self.rb2)
+        radio_group.addWidget(self.rb3)
+        radio_group.addWidget(self.custom_input)
+
+        for checkbox in [
+            self.label_checkbox, self.show_net_checkbox, self.show_histogram_checkbox, self.show_binned_checkbox,
+            self.show_models_checkbox, self.show_fit_convergence_checkbox, self.show_weibull_checkbox,
+            self.show_distribution_comparison_checkbox, self.degree_slider, self.degree_value
+        ]:
+            checkbox_group.addWidget(checkbox)
+
+        configuration.addLayout(radio_group)
+        configuration.addLayout(checkbox_group)
+
+        left_col.addWidget(self.label)
+        left_col.addWidget(self.btn_select)
+        left_col.addLayout(configuration)
+        for widget in [
+            self.btn_analyze, self.btn_export_csv_G1, self.btn_export_csv_G2, self.btn_export_html_G1,
+            self.btn_export_html_G2, self.btn_save
+        ]:
+            left_col.addWidget(widget)
+
+        layout.addLayout(left_col)
         layout.addWidget(self.results)
         self.setLayout(layout)
 
@@ -218,8 +181,7 @@ class GraphAnalysisApp(QWidget):
                     self.radio_group.checkedId() == 3):
                 self.show_snackbar("Ignoring punctuation!")
 
-            with open(self.file_path, "r", encoding="utf-8") as file:
-                text = file.read()
+            text = self.load_text_from_file()
 
             tokens_with = tokenize_text(text, keep_punctuation=True)
             tokens_without = tokenize_text(text, keep_punctuation=False)
@@ -233,42 +195,38 @@ class GraphAnalysisApp(QWidget):
             slopes = network.compute_slopes(models)
             self.table = compare_networks(self.G1, self.G2)
             self.table_2 = ling_analysis(text, slopes)
-
-            ks, freqs, q, beta = get_weibull_parameters(tokens_with, config["punctuation_pattern"])
-
-            if config["show_net"]:
-                self.plotted_graphs.append(plot_networks(
-                    [self.G1, self.G2],["Network with punctuation", "Network without punctuation"]))
-            if config["show_binned"]:
-                self.plotted_graphs.append(plot_digree_distribution(self.G1, self.G2))
-                # self.plotted_graphs.append(plot_digree_distribution(self.G1, self.G2, binned=True,
-                #                                                     xscale="linear", yscale="log"))
-                # self.plotted_graphs.append(plot_digree_distribution(self.G1, self.G2, binned=True,
-                #                                                     xscale="linear", yscale="linear"))
-            if config["show_histogram"]:
-                self.plotted_graphs.append(plot_digree_distribution(self.G1, self.G2, binned=False,
-                                                                    xscale="log", yscale="log"))
-                # self.plotted_graphs.append(plot_digree_distribution(self.G1, self.G2, binned=False,
-                #                                                     xscale="linear", yscale="log"))
-                # self.plotted_graphs.append(plot_digree_distribution(self.G1, self.G2, binned=False,
-                #                                                     xscale="linear", yscale="linear"))
-            if config["show_models"]:
-                self.model_window = network.show_model_plot_window(models)
-                # self.plotted_graphs.append(self.model_window)
-            if config["show_fit_convergence"]:
-                self.plotted_graphs.append(network.plot_fit_convergence(
-                    network.fit_convergence_analysis(text, step_size=1000)))
-            if config["show_weibull"] and q and beta:
-                self.plotted_graphs.append(network.plot_weibull_fit(ks, freqs, q, beta))
-            if config["show_distribution_comparison"]:
-                self.plotted_graphs.append(network.plot_distribution_comparisons(ks, freqs, q, beta))
-
             self.results.setHtml(table_to_html(self.table, self.table_2))
+
+            self.plot_graphs(config, models, text, tokens_with)
+            self.show_snackbar("Analysis finished")
         except Exception as e:
             print(f"An error occurred during analysis: {e}")
             self.show_snackbar("Analysis unsuccessful")
             return
-        self.show_snackbar("Analysis finished")
+
+    def plot_graphs(self, config, models, text, tokens_with):
+        ks, freqs, q, beta = get_weibull_parameters(tokens_with, config["punctuation_pattern"])
+        if config["show_net"]:
+            self.plotted_graphs.append(plot_networks(
+                [self.G1, self.G2], ["Network with punctuation", "Network without punctuation"]))
+        if config["show_binned"]:
+            self.plotted_graphs.append(plot_digree_distribution(self.G1, self.G2))
+        if config["show_histogram"]:
+            self.plotted_graphs.append(plot_digree_distribution(self.G1, self.G2, binned=False,
+                                                                xscale="log", yscale="log"))
+        if config["show_models"]:
+            self.model_window = network.show_model_plot_window(models)
+        if config["show_fit_convergence"]:
+            self.plotted_graphs.append(network.plot_fit_convergence(
+                network.fit_convergence_analysis(text, step_size=1000)))
+        if config["show_weibull"] and q and beta:
+            self.plotted_graphs.append(network.plot_weibull_fit(ks, freqs, q, beta))
+        if config["show_distribution_comparison"]:
+            self.plotted_graphs.append(network.plot_distribution_comparisons(ks, freqs, q, beta))
+
+    def load_text_from_file(self):
+        with open(self.file_path, encoding='utf-8') as f:
+            return f.read()
 
     def save_analysis(self):
         file_path, _ = QFileDialog.getSaveFileName(

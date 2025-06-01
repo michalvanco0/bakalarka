@@ -8,13 +8,13 @@
     "punc_edge_color": "salmon",
     "weighted": false,
     "directed": false,
-    "show_labels": false,
-    "show_net": false,
-    "min_degree": 0,
-    "show_histogram": false,
-    "show_fit_convergence": false,
-    "show_weibull": false,
-    "show_distribution_comparison": false,
+    "show_labels": true,
+    "show_net": true,
+    "min_degree": 10,
+    "show_histogram": true,
+    "show_fit_convergence": true,
+    "show_weibull": true,
+    "show_distribution_comparison": true,
     "show_models": true,
-    "show_binned": false
+    "show_binned": true
 }
