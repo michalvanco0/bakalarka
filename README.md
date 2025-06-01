@@ -1,4 +1,5 @@
 # Punctuation Network Analyzer
+
 Punctuation Network Analyzer je desktopová aplikácia slúžiaca na analýzu textov pomocou sieťovej reprezentácie interpunkčných a slovných štruktúr. Umožňuje vizualizáciu, štatistickú analýzu a export výstupov do viacerých formátov.
 
 ## Spustenie aplikácie
@@ -9,7 +10,7 @@ pip install -r requirements.txt
 Medzi hlavné závislosti patria: PyQt6, networkx, reportlab.
 Spustite aplikáciu príkazom:
 ```bash
-python main . py
+python main.py
 ```
 Otvorí sa hlavné okno aplikácie.
 
@@ -48,7 +49,7 @@ Aplikácia vykoná:
  - Vytvorenie dvoch sietí: G1 – so započítanou interpunkciou; G2 – bez interpunkcie
  - Výpočet štatistických a lingvistických metrík
  - Vizualizácie podľa zvolených nastavení
- - Výstup zobrazí v pravej časti oknaMANUÁL K APLIKÁCII PUNCTUATION NETWORK ANALYZER 38
+ - Výstup zobrazí v pravej časti okna
 
 ## Export výsledkov
 Po úspešnej analýze môžete výsledky exportovať:
