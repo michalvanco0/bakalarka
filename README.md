@@ -3,10 +3,14 @@ Punctuation Network Analyzer je desktopová aplikácia slúžiaca na analýzu te
 
 ## Spustenie aplikácie
 Skontrolujte, že máte nainštalovaný Python 3.10+ a potrebné knižnice:
-p i p i n s t a l l −r r e q u i r e m e n t s . t x t
+```bash
+pip install -r requirements.txt
+```
 Medzi hlavné závislosti patria: PyQt6, networkx, reportlab.
 Spustite aplikáciu príkazom:
+```bash
 python main . py
+```
 Otvorí sa hlavné okno aplikácie.
 
 ## Výber vstupného súboru
