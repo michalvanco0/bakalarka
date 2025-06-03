@@ -248,7 +248,7 @@ def ling_analysis(text, slopes=None):
         "Punctuation density": punctuation_count / len(text),
         "Character count": len(text),
         "Word frequency (top 10)": freq(tokens),
-        "Sentiment": "Positive" if sentiment_score > 0 else "Negative" if sentiment_score < 0 else "Neutral",
+        "Sentiment": "Positive" if sentiment_score > 0.45 else "Negative" if sentiment_score < 0.45 else "Neutral",
         "Readability": readability(text),
         "Syllable count": textstat.syllable_count(text),
         "POS distribution": pos_distribution(tokens),
